@@ -2,8 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  // API 키 검증
-  const claudeKey = request.headers.get('x-claude-key')
+  // API 키 검증 (쿼리 파라미터)
+  const { searchParams } = new URL(request.url)
+  const claudeKey = searchParams.get('key')
   const secretKey = process.env.CLAUDE_SECRET_KEY
 
   if (!secretKey || claudeKey !== secretKey) {

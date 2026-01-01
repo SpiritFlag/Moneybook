@@ -242,6 +242,12 @@ export type Database = {
           original_amount: number | null
           original_currency_id: string | null
           exchange_rate: number | null
+          from_adjustment_amount: number
+          from_adjustment_is_plus: boolean
+          from_adjustment_memo: string | null
+          to_adjustment_amount: number
+          to_adjustment_is_plus: boolean
+          to_adjustment_memo: string | null
           title: string | null
           memo: string | null
           sort_order: number
@@ -258,6 +264,12 @@ export type Database = {
           original_amount?: number | null
           original_currency_id?: string | null
           exchange_rate?: number | null
+          from_adjustment_amount?: number
+          from_adjustment_is_plus?: boolean
+          from_adjustment_memo?: string | null
+          to_adjustment_amount?: number
+          to_adjustment_is_plus?: boolean
+          to_adjustment_memo?: string | null
           title?: string | null
           memo?: string | null
           sort_order?: number
@@ -274,6 +286,12 @@ export type Database = {
           original_amount?: number | null
           original_currency_id?: string | null
           exchange_rate?: number | null
+          from_adjustment_amount?: number
+          from_adjustment_is_plus?: boolean
+          from_adjustment_memo?: string | null
+          to_adjustment_amount?: number
+          to_adjustment_is_plus?: boolean
+          to_adjustment_memo?: string | null
           title?: string | null
           memo?: string | null
           sort_order?: number

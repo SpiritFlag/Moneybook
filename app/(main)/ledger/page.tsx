@@ -104,11 +104,31 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
 
   if (entry.type === 'transfer') {
     const transfer = entry.data as Transfer
-    const amountDisplay = formatAmountWithOriginal(
-      transfer.amount,
-      transfer.original_amount,
-      transfer.original_currency_id
-    )
+
+    // 출금/입금 자산의 통화 정보
+    const getAssetCurrency = (assetId: string) => {
+      const asset = assets.find((a) => a.id === assetId)
+      if (!asset?.currency_id) return { symbol: '원', rate: 1 }
+      const currency = currencies.find((c) => c.id === asset.currency_id)
+      if (!currency) return { symbol: '원', rate: 1 }
+      return { symbol: currency.symbol, rate: currency.exchange_rate }
+    }
+
+    const fromCurrency = getAssetCurrency(transfer.from_asset_id)
+    const toCurrency = getAssetCurrency(transfer.to_asset_id)
+
+    // 각 통화 단위로 금액 계산
+    const fromAmount = fromCurrency.rate > 1
+      ? Math.round(transfer.amount / fromCurrency.rate)
+      : transfer.amount
+    const toAmount = toCurrency.rate > 1
+      ? Math.round(transfer.amount / toCurrency.rate)
+      : transfer.amount
+
+    // 조정 정보 확인
+    const hasFromAdjustment = transfer.from_adjustment_amount > 0
+    const hasToAdjustment = transfer.to_adjustment_amount > 0
+    const hasAnyAdjustment = hasFromAdjustment || hasToAdjustment
 
     return (
       <div
@@ -134,12 +154,25 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
           {transfer.title && (
             <p className="text-gray-700 truncate">{transfer.title}</p>
           )}
+          {hasAnyAdjustment && (
+            <p className="text-xs text-gray-400">
+              {hasFromAdjustment && (
+                <span className={transfer.from_adjustment_is_plus ? 'text-green-500' : 'text-red-500'}>
+                  {transfer.from_adjustment_is_plus ? '+' : '-'}{formatCurrency(transfer.from_adjustment_amount)}
+                </span>
+              )}
+              {hasFromAdjustment && hasToAdjustment && ' / '}
+              {hasToAdjustment && (
+                <span className={transfer.to_adjustment_is_plus ? 'text-green-500' : 'text-red-500'}>
+                  {transfer.to_adjustment_is_plus ? '+' : '-'}{formatCurrency(transfer.to_adjustment_amount)}
+                </span>
+              )}
+            </p>
+          )}
         </div>
         <div className="text-right">
-          <span className="text-gray-600 font-medium">{amountDisplay.main}</span>
-          {amountDisplay.sub && (
-            <p className="text-xs text-gray-400">{amountDisplay.sub}</p>
-          )}
+          <p className="text-red-500 text-sm">{fromAmount.toLocaleString()} {fromCurrency.symbol}</p>
+          <p className="text-green-500 text-sm">{toAmount.toLocaleString()} {toCurrency.symbol}</p>
         </div>
       </div>
     )

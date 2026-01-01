@@ -33,6 +33,13 @@ export interface TransferFormData {
   originalAmount?: number | null
   originalCurrencyId?: string | null
   exchangeRate?: number | null
+  // 환전 조정 관련
+  fromAdjustmentAmount?: number
+  fromAdjustmentIsPlus?: boolean
+  fromAdjustmentMemo?: string
+  toAdjustmentAmount?: number
+  toAdjustmentIsPlus?: boolean
+  toAdjustmentMemo?: string
 }
 
 export function useTransactions(year: number, month: number) {
@@ -261,6 +268,12 @@ export function useCreateTransfer() {
           original_amount: data.originalAmount ?? null,
           original_currency_id: data.originalCurrencyId ?? null,
           exchange_rate: data.exchangeRate ?? null,
+          from_adjustment_amount: data.fromAdjustmentAmount ?? 0,
+          from_adjustment_is_plus: data.fromAdjustmentIsPlus ?? false,
+          from_adjustment_memo: data.fromAdjustmentMemo || null,
+          to_adjustment_amount: data.toAdjustmentAmount ?? 0,
+          to_adjustment_is_plus: data.toAdjustmentIsPlus ?? true,
+          to_adjustment_memo: data.toAdjustmentMemo || null,
           title: data.title || null,
           memo: data.memo || null,
           sort_order: nextOrder,
@@ -294,6 +307,12 @@ export function useUpdateTransfer() {
           original_amount: data.originalAmount ?? null,
           original_currency_id: data.originalCurrencyId ?? null,
           exchange_rate: data.exchangeRate ?? null,
+          from_adjustment_amount: data.fromAdjustmentAmount ?? 0,
+          from_adjustment_is_plus: data.fromAdjustmentIsPlus ?? false,
+          from_adjustment_memo: data.fromAdjustmentMemo || null,
+          to_adjustment_amount: data.toAdjustmentAmount ?? 0,
+          to_adjustment_is_plus: data.toAdjustmentIsPlus ?? true,
+          to_adjustment_memo: data.toAdjustmentMemo || null,
           title: data.title || null,
           memo: data.memo || null,
           updated_at: new Date().toISOString(),

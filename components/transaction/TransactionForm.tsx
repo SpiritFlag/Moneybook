@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { CalendarIcon, Trash2 } from 'lucide-react'
+import { CalendarIcon, Trash2, ArrowRight, Plus, Minus } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -45,7 +45,7 @@ import {
 } from '@/lib/hooks/useTransactions'
 import { toDateString, getKSTToday, fromDateString } from '@/lib/utils/date'
 import { formatNumber, parseCurrency } from '@/lib/utils/currency'
-import type { Transaction, Transfer, Asset } from '@/types/database'
+import type { Transaction, Transfer } from '@/types/database'
 
 type TransactionType = 'income' | 'expense' | 'transfer'
 
@@ -81,8 +81,7 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
 
   const [amountInput, setAmountInput] = useState(() => {
     // 보조화폐가 있으면 원본 금액을, 없으면 환산된 금액을 표시
-    const amount = transaction?.original_amount ?? transaction?.amount ??
-                   transfer?.original_amount ?? transfer?.amount ?? 0
+    const amount = transaction?.original_amount ?? transaction?.amount ?? 0
     return amount > 0 ? formatNumber(amount) : ''
   })
   const [adjustmentInput, setAdjustmentInput] = useState(() => {
@@ -90,6 +89,19 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
     return adj > 0 ? formatNumber(adj) : ''
   })
   const [adjustmentMemo, setAdjustmentMemo] = useState(transaction?.adjustment_memo || '')
+
+  // 이체용 금액 상태 (from/to 각각)
+  const [fromAmountInput, setFromAmountInput] = useState('')
+  const [toAmountInput, setToAmountInput] = useState('')
+  const [lastEditedSide, setLastEditedSide] = useState<'from' | 'to'>('from')
+
+  // 이체 조정 필드
+  const [fromAdjustmentInput, setFromAdjustmentInput] = useState('')
+  const [fromAdjustmentIsPlus, setFromAdjustmentIsPlus] = useState(false)
+  const [fromAdjustmentMemo, setFromAdjustmentMemo] = useState('')
+  const [toAdjustmentInput, setToAdjustmentInput] = useState('')
+  const [toAdjustmentIsPlus, setToAdjustmentIsPlus] = useState(true)
+  const [toAdjustmentMemo, setToAdjustmentMemo] = useState('')
   const [title, setTitle] = useState(transaction?.title || transfer?.title || '')
   const [memo, setMemo] = useState(transaction?.memo || transfer?.memo || '')
 
@@ -106,22 +118,63 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
   const currencyInfo = useMemo(() => {
     const getAssetCurrency = (id: string) => {
       const asset = assets.find((a) => a.id === id)
-      if (!asset?.currency_id) return null
-      return currencies.find((c) => c.id === asset.currency_id)
+      if (!asset?.currency_id) return { symbol: '원', rate: 1, id: null }
+      const currency = currencies.find((c) => c.id === asset.currency_id)
+      if (!currency) return { symbol: '원', rate: 1, id: null }
+      return { symbol: currency.symbol, rate: currency.exchange_rate, id: currency.id }
     }
 
-    const selectedCurrency = assetId ? getAssetCurrency(assetId) : null
-    const fromCurrency = fromAssetId ? getAssetCurrency(fromAssetId) : null
-    const currency = selectedCurrency || fromCurrency
+    // 수입/지출용
+    const selectedInfo = assetId ? getAssetCurrency(assetId) : { symbol: '원', rate: 1, id: null }
+
+    // 이체용
+    const fromInfo = fromAssetId ? getAssetCurrency(fromAssetId) : { symbol: '원', rate: 1, id: null }
+    const toInfo = toAssetId ? getAssetCurrency(toAssetId) : { symbol: '원', rate: 1, id: null }
 
     return {
-      symbol: currency?.symbol || '원',
-      exchangeRate: currency?.exchange_rate || null,
-      currencyId: currency?.id || null,
+      // 수입/지출용
+      symbol: selectedInfo.symbol,
+      exchangeRate: selectedInfo.rate > 1 ? selectedInfo.rate : null,
+      currencyId: selectedInfo.id,
+      // 이체용
+      from: fromInfo,
+      to: toInfo,
     }
-  }, [assetId, fromAssetId, assets, currencies])
+  }, [assetId, fromAssetId, toAssetId, assets, currencies])
 
   const currencySymbol = currencyInfo.symbol
+
+  // 기존 이체 데이터 로드
+  useEffect(() => {
+    if (transfer) {
+      // 조정 필드
+      setFromAdjustmentInput(transfer.from_adjustment_amount > 0 ? formatNumber(transfer.from_adjustment_amount) : '')
+      setFromAdjustmentIsPlus(transfer.from_adjustment_is_plus)
+      setFromAdjustmentMemo(transfer.from_adjustment_memo || '')
+      setToAdjustmentInput(transfer.to_adjustment_amount > 0 ? formatNumber(transfer.to_adjustment_amount) : '')
+      setToAdjustmentIsPlus(transfer.to_adjustment_is_plus)
+      setToAdjustmentMemo(transfer.to_adjustment_memo || '')
+    }
+  }, [transfer])
+
+  // 자산 선택이 완료된 후 이체 금액 초기화
+  useEffect(() => {
+    if (transfer && fromAssetId && toAssetId && currencyInfo.from && currencyInfo.to) {
+      const krwAmount = transfer.amount
+
+      // from 자산의 통화로 변환
+      const fromAmount = currencyInfo.from.rate > 1
+        ? Math.round(krwAmount / currencyInfo.from.rate)
+        : krwAmount
+      setFromAmountInput(fromAmount > 0 ? formatNumber(fromAmount) : '')
+
+      // to 자산의 통화로 변환
+      const toAmount = currencyInfo.to.rate > 1
+        ? Math.round(krwAmount / currencyInfo.to.rate)
+        : krwAmount
+      setToAmountInput(toAmount > 0 ? formatNumber(toAmount) : '')
+    }
+  }, [transfer, fromAssetId, toAssetId, currencyInfo.from?.rate, currencyInfo.to?.rate])
 
   // 뮤테이션
   const createTransaction = useCreateTransaction()
@@ -133,6 +186,14 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
 
   const isLoading = createTransaction.isPending || updateTransaction.isPending ||
     createTransfer.isPending || updateTransfer.isPending
+
+  // 두 자산의 통화가 다른지 확인 (환전 UI 표시 여부)
+  const isDifferentCurrency = useMemo(() => {
+    if (type !== 'transfer') return false
+    if (!fromAssetId || !toAssetId) return false
+    return currencyInfo.from.id !== currencyInfo.to.id ||
+           currencyInfo.from.rate !== currencyInfo.to.rate
+  }, [type, fromAssetId, toAssetId, currencyInfo.from, currencyInfo.to])
 
   // 자산 그룹핑
   const groupedAssets = assetCategories.map((cat) => ({
@@ -159,16 +220,60 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
     setAdjustmentInput(num === 0 && value !== '0' ? '' : formatNumber(num))
   }
 
+  // 이체 금액 핸들러 (환율 자동 계산)
+  const handleFromAmountChange = (value: string) => {
+    const num = parseCurrency(value)
+    setFromAmountInput(num === 0 && value !== '0' ? '' : formatNumber(num))
+    setLastEditedSide('from')
+
+    // from → to 변환
+    if (num > 0 && currencyInfo.from && currencyInfo.to) {
+      const krwAmount = num * currencyInfo.from.rate
+      const toAmount = currencyInfo.to.rate > 1
+        ? Math.round(krwAmount / currencyInfo.to.rate)
+        : Math.round(krwAmount)
+      setToAmountInput(formatNumber(toAmount))
+    } else {
+      setToAmountInput('')
+    }
+  }
+
+  const handleToAmountChange = (value: string) => {
+    const num = parseCurrency(value)
+    setToAmountInput(num === 0 && value !== '0' ? '' : formatNumber(num))
+    setLastEditedSide('to')
+
+    // to → from 변환
+    if (num > 0 && currencyInfo.from && currencyInfo.to) {
+      const krwAmount = num * currencyInfo.to.rate
+      const fromAmount = currencyInfo.from.rate > 1
+        ? Math.round(krwAmount / currencyInfo.from.rate)
+        : Math.round(krwAmount)
+      setFromAmountInput(formatNumber(fromAmount))
+    } else {
+      setFromAmountInput('')
+    }
+  }
+
+  const handleTransferAdjustmentChange = (
+    value: string,
+    setter: (v: string) => void
+  ) => {
+    const num = parseCurrency(value)
+    setter(num === 0 && value !== '0' ? '' : formatNumber(num))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const amount = parseCurrency(amountInput)
-    if (amount <= 0) {
-      toast.error('금액을 입력해주세요')
-      return
-    }
-
     if (type === 'transfer') {
+      const fromAmount = parseCurrency(fromAmountInput)
+      const toAmount = parseCurrency(toAmountInput)
+
+      if (fromAmount <= 0 || toAmount <= 0) {
+        toast.error('금액을 입력해주세요')
+        return
+      }
       if (!fromAssetId || !toAssetId) {
         toast.error('자산을 선택해주세요')
         return
@@ -178,21 +283,25 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
         return
       }
 
-      // 보조화폐인 경우 원화로 환산
-      const { exchangeRate, currencyId } = currencyInfo
-      const convertedAmount = exchangeRate ? Math.round(amount * exchangeRate) : amount
+      // 기준 금액 결정 (마지막 수정된 쪽 기준)
+      const krwAmount = lastEditedSide === 'from'
+        ? Math.round(fromAmount * currencyInfo.from.rate)
+        : Math.round(toAmount * currencyInfo.to.rate)
 
       const data: TransferFormData = {
         transferDate: toDateString(date),
         fromAssetId,
         toAssetId,
-        amount: convertedAmount,
+        amount: krwAmount,
         title: title || undefined,
         memo: memo || undefined,
-        // 보조화폐 정보
-        originalAmount: exchangeRate ? amount : null,
-        originalCurrencyId: currencyId,
-        exchangeRate: exchangeRate,
+        // 조정 정보
+        fromAdjustmentAmount: parseCurrency(fromAdjustmentInput),
+        fromAdjustmentIsPlus,
+        fromAdjustmentMemo: fromAdjustmentMemo || undefined,
+        toAdjustmentAmount: parseCurrency(toAdjustmentInput),
+        toAdjustmentIsPlus,
+        toAdjustmentMemo: toAdjustmentMemo || undefined,
       }
 
       if (transfer) {
@@ -213,6 +322,11 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
         })
       }
     } else {
+      const amount = parseCurrency(amountInput)
+      if (amount <= 0) {
+        toast.error('금액을 입력해주세요')
+        return
+      }
       if (!assetId) {
         toast.error('자산을 선택해주세요')
         return
@@ -355,55 +469,189 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
           </DialogContent>
         </Dialog>
 
-        {/* 자산 선택 */}
+        {/* 이체 UI */}
         {type === 'transfer' ? (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>출금 자산</Label>
-              <Select value={fromAssetId} onValueChange={setFromAssetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groupedAssets.map((group) => (
-                    <div key={group.id}>
-                      <div className="px-2 py-1.5 text-xs font-medium text-gray-500">
-                        {group.name}
+          <>
+            <Card className="p-4 space-y-4">
+              {/* 출금 (From) */}
+              <div className="space-y-2">
+                <Label className="text-red-600">출금</Label>
+                <Select value={fromAssetId} onValueChange={setFromAssetId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="출금 자산 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groupedAssets.map((group) => (
+                      <div key={group.id}>
+                        <div className="px-2 py-1.5 text-xs font-medium text-gray-500">
+                          {group.name}
+                        </div>
+                        {group.assets.map((asset) => (
+                          <SelectItem key={asset.id} value={asset.id}>
+                            {asset.name}
+                          </SelectItem>
+                        ))}
                       </div>
-                      {group.assets.map((asset) => (
-                        <SelectItem key={asset.id} value={asset.id}>
-                          {asset.name}
-                        </SelectItem>
-                      ))}
-                    </div>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>입금 자산</Label>
-              <Select value={toAssetId} onValueChange={setToAssetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groupedAssets.map((group) => (
-                    <div key={group.id}>
-                      <div className="px-2 py-1.5 text-xs font-medium text-gray-500">
-                        {group.name}
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={fromAmountInput}
+                    onChange={(e) => handleFromAmountChange(e.target.value)}
+                    placeholder="0"
+                    className="text-right text-lg font-medium flex-1"
+                  />
+                  <span className="text-gray-500 shrink-0">
+                    {currencyInfo.from.symbol}
+                  </span>
+                </div>
+              </div>
+
+              {/* 화살표 */}
+              <div className="flex justify-center">
+                <ArrowRight className="w-6 h-6 text-gray-400" />
+              </div>
+
+              {/* 입금 (To) */}
+              <div className="space-y-2">
+                <Label className="text-green-600">입금</Label>
+                <Select value={toAssetId} onValueChange={setToAssetId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="입금 자산 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groupedAssets.map((group) => (
+                      <div key={group.id}>
+                        <div className="px-2 py-1.5 text-xs font-medium text-gray-500">
+                          {group.name}
+                        </div>
+                        {group.assets.map((asset) => (
+                          <SelectItem key={asset.id} value={asset.id}>
+                            {asset.name}
+                          </SelectItem>
+                        ))}
                       </div>
-                      {group.assets.map((asset) => (
-                        <SelectItem key={asset.id} value={asset.id}>
-                          {asset.name}
-                        </SelectItem>
-                      ))}
-                    </div>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={toAmountInput}
+                    onChange={(e) => handleToAmountChange(e.target.value)}
+                    placeholder="0"
+                    className="text-right text-lg font-medium flex-1"
+                  />
+                  <span className="text-gray-500 shrink-0">
+                    {currencyInfo.to.symbol}
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* 조정 섹션 (통화가 다를 때만 표시) */}
+            {isDifferentCurrency && (
+              <Card className="p-4 space-y-4">
+                <Label className="text-gray-600 text-sm">조정 (선택)</Label>
+
+                {/* 출금 조정 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 w-12">출금</span>
+                    <Button
+                      type="button"
+                      variant={fromAdjustmentIsPlus ? 'outline' : 'default'}
+                      size="sm"
+                      className={`w-8 h-8 p-0 ${!fromAdjustmentIsPlus ? 'bg-red-100 hover:bg-red-200 text-red-600' : ''}`}
+                      onClick={() => setFromAdjustmentIsPlus(false)}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={fromAdjustmentIsPlus ? 'default' : 'outline'}
+                      size="sm"
+                      className={`w-8 h-8 p-0 ${fromAdjustmentIsPlus ? 'bg-green-100 hover:bg-green-200 text-green-600' : ''}`}
+                      onClick={() => setFromAdjustmentIsPlus(true)}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={fromAdjustmentInput}
+                      onChange={(e) => handleTransferAdjustmentChange(e.target.value, setFromAdjustmentInput)}
+                      placeholder="0"
+                      className="text-right flex-1"
+                    />
+                    <span className="text-gray-500 text-sm shrink-0">
+                      {currencyInfo.from.symbol}
+                    </span>
+                  </div>
+                  {parseCurrency(fromAdjustmentInput) > 0 && (
+                    <Input
+                      type="text"
+                      value={fromAdjustmentMemo}
+                      onChange={(e) => setFromAdjustmentMemo(e.target.value)}
+                      placeholder="조정 사유 (예: 수수료)"
+                      className="text-sm"
+                    />
+                  )}
+                </div>
+
+                {/* 입금 조정 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 w-12">입금</span>
+                    <Button
+                      type="button"
+                      variant={toAdjustmentIsPlus ? 'outline' : 'default'}
+                      size="sm"
+                      className={`w-8 h-8 p-0 ${!toAdjustmentIsPlus ? 'bg-red-100 hover:bg-red-200 text-red-600' : ''}`}
+                      onClick={() => setToAdjustmentIsPlus(false)}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={toAdjustmentIsPlus ? 'default' : 'outline'}
+                      size="sm"
+                      className={`w-8 h-8 p-0 ${toAdjustmentIsPlus ? 'bg-green-100 hover:bg-green-200 text-green-600' : ''}`}
+                      onClick={() => setToAdjustmentIsPlus(true)}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={toAdjustmentInput}
+                      onChange={(e) => handleTransferAdjustmentChange(e.target.value, setToAdjustmentInput)}
+                      placeholder="0"
+                      className="text-right flex-1"
+                    />
+                    <span className="text-gray-500 text-sm shrink-0">
+                      {currencyInfo.to.symbol}
+                    </span>
+                  </div>
+                  {parseCurrency(toAdjustmentInput) > 0 && (
+                    <Input
+                      type="text"
+                      value={toAdjustmentMemo}
+                      onChange={(e) => setToAdjustmentMemo(e.target.value)}
+                      placeholder="조정 사유 (예: 보너스)"
+                      className="text-sm"
+                    />
+                  )}
+                </div>
+              </Card>
+            )}
+          </>
         ) : (
+          // 수입/지출 자산 선택
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>자산</Label>
@@ -445,51 +693,53 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
           </div>
         )}
 
-        {/* 금액 입력 */}
-        <div className="space-y-2">
-          <Label>금액</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={amountInput}
-              onChange={(e) => handleAmountChange(e.target.value)}
-              placeholder="0"
-              className="text-right text-lg font-medium flex-1"
-            />
-            <span className="text-gray-500 shrink-0">
-              {currencySymbol}
-            </span>
-          </div>
-        </div>
-
-        {/* 할인/공제 (이체가 아닐 때만) */}
+        {/* 금액 입력 (수입/지출만) */}
         {type !== 'transfer' && (
-          <div className="space-y-2">
-            <Label>{type === 'income' ? '공제' : '할인'} (선택)</Label>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1 flex-1">
+          <>
+            <div className="space-y-2">
+              <Label>금액</Label>
+              <div className="flex items-center gap-2">
                 <Input
                   type="text"
                   inputMode="numeric"
-                  value={adjustmentInput}
-                  onChange={(e) => handleAdjustmentChange(e.target.value)}
+                  value={amountInput}
+                  onChange={(e) => handleAmountChange(e.target.value)}
                   placeholder="0"
-                  className="text-right"
+                  className="text-right text-lg font-medium flex-1"
                 />
-                <span className="text-gray-500 text-sm shrink-0">
+                <span className="text-gray-500 shrink-0">
                   {currencySymbol}
                 </span>
               </div>
-              <Input
-                type="text"
-                value={adjustmentMemo}
-                onChange={(e) => setAdjustmentMemo(e.target.value)}
-                placeholder="메모"
-                className="flex-1"
-              />
             </div>
-          </div>
+
+            {/* 할인/공제 */}
+            <div className="space-y-2">
+              <Label>{type === 'income' ? '공제' : '할인'} (선택)</Label>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1 flex-1">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={adjustmentInput}
+                    onChange={(e) => handleAdjustmentChange(e.target.value)}
+                    placeholder="0"
+                    className="text-right"
+                  />
+                  <span className="text-gray-500 text-sm shrink-0">
+                    {currencySymbol}
+                  </span>
+                </div>
+                <Input
+                  type="text"
+                  value={adjustmentMemo}
+                  onChange={(e) => setAdjustmentMemo(e.target.value)}
+                  placeholder="메모"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+          </>
         )}
 
         {/* 내용 */}

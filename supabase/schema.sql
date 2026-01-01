@@ -189,3 +189,26 @@ ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAUL
 
 -- 자산에 보조화폐 연결
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS currency_id UUID REFERENCES currencies(id) ON DELETE SET NULL;
+
+-- ============================================
+-- 거래/이체 보조화폐 관련 컬럼 추가 (v3)
+-- ============================================
+
+-- transactions 테이블에 보조화폐 컬럼 추가
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS original_amount BIGINT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS original_adjustment_amount BIGINT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS original_currency_id UUID REFERENCES currencies(id) ON DELETE SET NULL;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(15, 4);
+
+-- transfers 테이블에 보조화폐 컬럼 추가
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS original_amount BIGINT;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS original_currency_id UUID REFERENCES currencies(id) ON DELETE SET NULL;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(15, 4);
+
+-- transfers 테이블에 환전 조정 필드 추가
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS from_adjustment_amount BIGINT DEFAULT 0;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS from_adjustment_is_plus BOOLEAN DEFAULT false;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS from_adjustment_memo TEXT;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS to_adjustment_amount BIGINT DEFAULT 0;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS to_adjustment_is_plus BOOLEAN DEFAULT true;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS to_adjustment_memo TEXT;

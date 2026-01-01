@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, PlusCircle, BookOpen, Wallet, Tag } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, BookOpen, Wallet, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -10,7 +10,7 @@ const navItems = [
   { href: '/input', label: '입력', icon: PlusCircle },
   { href: '/ledger', label: '가계부', icon: BookOpen },
   { href: '/assets', label: '자산', icon: Wallet },
-  { href: '/categories', label: '분류', icon: Tag },
+  { href: '/settings', label: '설정', icon: Settings },
 ]
 
 export function BottomNav() {

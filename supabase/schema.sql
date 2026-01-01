@@ -151,3 +151,41 @@ DROP POLICY IF EXISTS "Users can manage own transfers" ON transfers;
 CREATE POLICY "Users can manage own transfers" ON transfers
   FOR ALL USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- ============================================
+-- 추가 스키마 (v2)
+-- ============================================
+
+-- 7. 보조화폐 테이블
+CREATE TABLE IF NOT EXISTS currencies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name VARCHAR(50) NOT NULL,           -- 큐나, 포인트 등
+  symbol VARCHAR(10) NOT NULL,         -- Q, P 등 단위 기호
+  exchange_rate NUMERIC(15, 4) NOT NULL, -- 1단위 = N원 (소수점 4자리)
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- currencies RLS
+ALTER TABLE currencies ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage own currencies" ON currencies;
+CREATE POLICY "Users can manage own currencies" ON currencies
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- currencies 인덱스
+CREATE INDEX IF NOT EXISTS idx_currencies_sort ON currencies(user_id, sort_order);
+
+-- ============================================
+-- 기존 테이블 컬럼 추가 (v2)
+-- Supabase에서 ALTER 문으로 별도 실행 필요
+-- ============================================
+
+-- 분류에 이모지 추가
+ALTER TABLE income_categories ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '💰';
+ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '📦';
+
+-- 자산에 보조화폐 연결
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS currency_id UUID REFERENCES currencies(id) ON DELETE SET NULL;

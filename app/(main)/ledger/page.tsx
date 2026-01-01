@@ -66,9 +66,9 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
   }
 
   const getAssetName = (id: string) => assets.find((a) => a.id === id)?.name || ''
-  const getCategoryName = (id: string, type: 'income' | 'expense') => {
+  const getCategory = (id: string, type: 'income' | 'expense') => {
     const cats = type === 'income' ? incomeCategories : expenseCategories
-    return cats.find((c) => c.id === id)?.name || ''
+    return cats.find((c) => c.id === id)
   }
 
   if (entry.type === 'transfer') {
@@ -105,6 +105,7 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
   const transaction = entry.data as Transaction
   const effectiveAmount = getEffectiveAmount(transaction.amount, transaction.adjustment_amount)
   const isIncome = transaction.type === 'income'
+  const category = getCategory(transaction.category_id, transaction.type)
 
   return (
     <div
@@ -117,16 +118,12 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
         isIncome ? 'hover:border-income/50' : 'hover:border-expense/50'
       }`}
     >
-      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-        isIncome ? 'bg-income/30' : 'bg-expense/30'
-      }`}>
-        <span className={`text-xs font-medium ${isIncome ? 'text-green-700' : 'text-red-700'}`}>
-          {isIncome ? '+' : '-'}
-        </span>
+      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xl">
+        {category?.emoji || (isIncome ? '💰' : '📦')}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span>{getCategoryName(transaction.category_id, transaction.type)}</span>
+          <span>{category?.name || ''}</span>
           <span className="text-gray-300">|</span>
           <span>{getAssetName(transaction.asset_id)}</span>
         </div>
@@ -166,7 +163,7 @@ export default function LedgerPage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 

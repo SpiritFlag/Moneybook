@@ -20,7 +20,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Plus, GripVertical, ChevronRight, Edit2 } from 'lucide-react'
+import { ArrowLeft, Plus, GripVertical, ChevronRight, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -97,11 +97,12 @@ function SortableCategoryItem({ category, type, onEdit, onClick }: SortableCateg
       >
         <Edit2 className="w-4 h-4" />
       </button>
+      <ChevronRight className="w-4 h-4 text-gray-400" />
     </div>
   )
 }
 
-export default function CategoriesPage() {
+export default function SettingsCategoriesPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'income' | 'expense'>('expense')
   const [formOpen, setFormOpen] = useState(false)
@@ -188,7 +189,17 @@ export default function CategoriesPage() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-800">분류 관리</h2>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push('/settings')}
+            className="h-8 w-8"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h2 className="text-lg font-semibold text-gray-800">분류 관리</h2>
+        </div>
         <Button
           size="sm"
           variant="outline"
@@ -245,7 +256,7 @@ export default function CategoriesPage() {
                           setEditingCategory(category)
                           setFormOpen(true)
                         }}
-                        onClick={() => router.push(`/categories/income/${category.id}`)}
+                        onClick={() => router.push(`/settings/categories/income/${category.id}`)}
                       />
                     ))}
                   </div>
@@ -281,7 +292,7 @@ export default function CategoriesPage() {
                           setEditingCategory(category)
                           setFormOpen(true)
                         }}
-                        onClick={() => router.push(`/categories/expense/${category.id}`)}
+                        onClick={() => router.push(`/settings/categories/expense/${category.id}`)}
                       />
                     ))}
                   </div>

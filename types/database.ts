@@ -40,6 +40,7 @@ export type Database = {
           id: string
           user_id: string
           category_id: string
+          currency_id: string | null
           name: string
           initial_balance: number
           sort_order: number
@@ -51,6 +52,7 @@ export type Database = {
           id?: string
           user_id: string
           category_id: string
+          currency_id?: string | null
           name: string
           initial_balance?: number
           sort_order?: number
@@ -62,6 +64,7 @@ export type Database = {
           id?: string
           user_id?: string
           category_id?: string
+          currency_id?: string | null
           name?: string
           initial_balance?: number
           sort_order?: number
@@ -75,6 +78,7 @@ export type Database = {
           id: string
           user_id: string
           name: string
+          emoji: string
           sort_order: number
           is_deleted: boolean
           created_at: string
@@ -84,6 +88,7 @@ export type Database = {
           id?: string
           user_id: string
           name: string
+          emoji?: string
           sort_order?: number
           is_deleted?: boolean
           created_at?: string
@@ -93,6 +98,7 @@ export type Database = {
           id?: string
           user_id?: string
           name?: string
+          emoji?: string
           sort_order?: number
           is_deleted?: boolean
           created_at?: string
@@ -104,6 +110,7 @@ export type Database = {
           id: string
           user_id: string
           name: string
+          emoji: string
           sort_order: number
           is_deleted: boolean
           created_at: string
@@ -113,6 +120,7 @@ export type Database = {
           id?: string
           user_id: string
           name: string
+          emoji?: string
           sort_order?: number
           is_deleted?: boolean
           created_at?: string
@@ -122,8 +130,41 @@ export type Database = {
           id?: string
           user_id?: string
           name?: string
+          emoji?: string
           sort_order?: number
           is_deleted?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      currencies: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          symbol: string
+          exchange_rate: number
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          symbol: string
+          exchange_rate: number
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          symbol?: string
+          exchange_rate?: number
+          sort_order?: number
           created_at?: string
           updated_at?: string
         }
@@ -237,6 +278,7 @@ export type AssetCategory = Database['public']['Tables']['asset_categories']['Ro
 export type Asset = Database['public']['Tables']['assets']['Row']
 export type IncomeCategory = Database['public']['Tables']['income_categories']['Row']
 export type ExpenseCategory = Database['public']['Tables']['expense_categories']['Row']
+export type Currency = Database['public']['Tables']['currencies']['Row']
 export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type Transfer = Database['public']['Tables']['transfers']['Row']
 

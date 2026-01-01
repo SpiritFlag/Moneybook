@@ -41,17 +41,19 @@ import {
   useReorderAssets,
 } from '@/lib/hooks/useAssets'
 import { formatCurrency } from '@/lib/utils/currency'
-import type { AssetCategory, Asset } from '@/types/database'
+import { useCurrencies } from '@/lib/hooks/useCurrencies'
+import type { AssetCategory, Asset, Currency } from '@/types/database'
 
 type AssetWithBalance = Asset & { current_balance: number }
 
 interface SortableAssetItemProps {
   asset: AssetWithBalance
+  currencies: Currency[]
   onEdit: () => void
   onClick: () => void
 }
 
-function SortableAssetItem({ asset, onEdit, onClick }: SortableAssetItemProps) {
+function SortableAssetItem({ asset, currencies, onEdit, onClick }: SortableAssetItemProps) {
   const {
     attributes,
     listeners,
@@ -66,6 +68,9 @@ function SortableAssetItem({ asset, onEdit, onClick }: SortableAssetItemProps) {
     transition,
     opacity: isDragging ? 0.5 : 1,
   }
+
+  const currency = currencies.find((c) => c.id === asset.currency_id)
+  const krwAmount = currency ? Math.round(asset.current_balance * currency.exchange_rate) : null
 
   return (
     <div
@@ -86,9 +91,17 @@ function SortableAssetItem({ asset, onEdit, onClick }: SortableAssetItemProps) {
       >
         <span className="font-medium text-gray-700">{asset.name}</span>
         <div className="flex items-center gap-2">
-          <span className={asset.current_balance >= 0 ? 'text-gray-800' : 'text-red-500'}>
-            {formatCurrency(asset.current_balance)}
-          </span>
+          <div className="text-right">
+            <span className={asset.current_balance >= 0 ? 'text-gray-800' : 'text-red-500'}>
+              {currency
+                ? `${asset.current_balance.toLocaleString()} ${currency.symbol}`
+                : formatCurrency(asset.current_balance)
+              }
+            </span>
+            {krwAmount !== null && (
+              <p className="text-xs text-gray-400">≈{formatCurrency(krwAmount)}</p>
+            )}
+          </div>
           <ChevronRight className="w-4 h-4 text-gray-400" />
         </div>
       </button>
@@ -108,6 +121,7 @@ function SortableAssetItem({ asset, onEdit, onClick }: SortableAssetItemProps) {
 export default function AssetsPage() {
   const router = useRouter()
   const { data: categories = [], isLoading: categoriesLoading } = useAssetCategories()
+  const { data: currencies = [] } = useCurrencies()
   const { data: assets = [], isLoading: assetsLoading } = useAssetsWithBalance()
 
   const [categoryFormOpen, setCategoryFormOpen] = useState(false)
@@ -127,7 +141,7 @@ export default function AssetsPage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
@@ -211,24 +225,26 @@ export default function AssetsPage() {
     })
   }
 
-  const handleCreateAsset = (data: { name: string; initialBalance: number; categoryId: string }) => {
+  const handleCreateAsset = (data: { name: string; initialBalance: number; categoryId: string; currencyId: string | null }) => {
     createAsset.mutate({
       categoryId: data.categoryId,
       name: data.name,
       initialBalance: data.initialBalance,
+      currencyId: data.currencyId,
     }, {
       onSuccess: () => toast.success('자산이 추가되었습니다'),
       onError: () => toast.error('추가에 실패했습니다'),
     })
   }
 
-  const handleUpdateAsset = (data: { name: string; initialBalance: number; categoryId: string }) => {
+  const handleUpdateAsset = (data: { name: string; initialBalance: number; categoryId: string; currencyId: string | null }) => {
     if (!editingAsset) return
     updateAsset.mutate({
       id: editingAsset.id,
       name: data.name,
       initialBalance: data.initialBalance,
       categoryId: data.categoryId,
+      currencyId: data.currencyId,
     }, {
       onSuccess: () => toast.success('수정되었습니다'),
       onError: () => toast.error('수정에 실패했습니다'),
@@ -334,6 +350,7 @@ export default function AssetsPage() {
                         <SortableAssetItem
                           key={asset.id}
                           asset={asset}
+                          currencies={currencies}
                           onEdit={() => {
                             setEditingAsset(asset)
                             setAssetFormOpen(true)

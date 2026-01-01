@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { EmojiPicker } from '@/components/ui/EmojiPicker'
 import type { IncomeCategory, ExpenseCategory } from '@/types/database'
 
 type Category = IncomeCategory | ExpenseCategory
@@ -29,7 +30,7 @@ interface CategoryFormProps {
   category?: Category | null
   allCategories: Category[]
   type: 'income' | 'expense'
-  onSubmit: (name: string) => void
+  onSubmit: (data: { name: string; emoji: string }) => void
   onDelete?: (replacementId: string) => void
 }
 
@@ -42,27 +43,33 @@ export function CategoryForm({
   onSubmit,
   onDelete,
 }: CategoryFormProps) {
-  const [name, setName] = useState(category?.name || '')
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState(type === 'income' ? '💰' : '📦')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [replacementId, setReplacementId] = useState('')
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
 
   const otherCategories = allCategories.filter((c) => c.id !== category?.id)
 
   useEffect(() => {
-    if (category) {
-      setName(category.name)
-    } else {
-      setName('')
+    if (open) {
+      if (category) {
+        setName(category.name)
+        setEmoji(category.emoji || (type === 'income' ? '💰' : '📦'))
+      } else {
+        setName('')
+        setEmoji(type === 'income' ? '💰' : '📦')
+      }
+      setShowDeleteConfirm(false)
+      setReplacementId('')
     }
-    setShowDeleteConfirm(false)
-    setReplacementId('')
-  }, [category, open])
+  }, [category, open, type])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
 
-    onSubmit(name.trim())
+    onSubmit({ name: name.trim(), emoji })
     onOpenChange(false)
   }
 
@@ -91,7 +98,7 @@ export function CategoryForm({
           </DialogHeader>
           <div className="space-y-4">
             <div className="p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
-              <p className="font-medium">{category?.name}</p>
+              <p className="font-medium">{category?.emoji} {category?.name}</p>
               <p className="text-yellow-700 mt-1">
                 이 분류를 삭제하면 해당 거래들이 선택한 분류로 이동됩니다.
               </p>
@@ -105,7 +112,7 @@ export function CategoryForm({
                 <SelectContent>
                   {otherCategories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
+                      {cat.emoji} {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -135,46 +142,65 @@ export function CategoryForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>
-            {type === 'income' ? '수입' : '지출'} 분류 {category ? '수정' : '추가'}
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">분류 이름</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={type === 'income' ? '예: 급여, 부수입' : '예: 식비, 교통비'}
-              required
-            />
-          </div>
-          <DialogFooter className="flex gap-2">
-            {category && onDelete && (
-              <Button
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {type === 'income' ? '수입' : '지출'} 분류 {category ? '수정' : '추가'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>이모지</Label>
+              <button
                 type="button"
-                variant="destructive"
-                onClick={handleDeleteClick}
-                className="mr-auto"
-                disabled={otherCategories.length === 0}
-                title={otherCategories.length === 0 ? '다른 분류가 없어 삭제할 수 없습니다' : undefined}
+                onClick={() => setEmojiPickerOpen(true)}
+                className="w-16 h-16 text-3xl rounded-lg border-2 border-dashed border-gray-200 hover:border-pastel-purple hover:bg-gray-50 transition-colors flex items-center justify-center"
               >
-                삭제
+                {emoji}
+              </button>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">분류 이름</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={type === 'income' ? '예: 급여, 부수입' : '예: 식비, 교통비'}
+                required
+              />
+            </div>
+            <DialogFooter className="flex gap-2">
+              {category && onDelete && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDeleteClick}
+                  className="mr-auto"
+                  disabled={otherCategories.length === 0}
+                  title={otherCategories.length === 0 ? '다른 분류가 없어 삭제할 수 없습니다' : undefined}
+                >
+                  삭제
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                취소
               </Button>
-            )}
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              취소
-            </Button>
-            <Button type="submit" className="bg-pastel-purple hover:bg-pastel-purple/80 text-gray-800">
-              {category ? '수정' : '추가'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <Button type="submit" className="bg-pastel-purple hover:bg-pastel-purple/80 text-gray-800">
+                {category ? '수정' : '추가'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <EmojiPicker
+        open={emojiPickerOpen}
+        onOpenChange={setEmojiPickerOpen}
+        onSelect={setEmoji}
+        currentEmoji={emoji}
+      />
+    </>
   )
 }

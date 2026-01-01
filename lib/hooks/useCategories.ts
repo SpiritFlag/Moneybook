@@ -45,7 +45,7 @@ export function useCreateIncomeCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ name }: { name: string }) => {
+    mutationFn: async ({ name, emoji = '💰' }: { name: string; emoji?: string }) => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
@@ -60,7 +60,7 @@ export function useCreateIncomeCategory() {
 
       const { data, error } = await supabase
         .from('income_categories')
-        .insert({ user_id: user.id, name, sort_order: nextOrder })
+        .insert({ user_id: user.id, name, emoji, sort_order: nextOrder })
         .select()
         .single()
 
@@ -78,7 +78,7 @@ export function useCreateExpenseCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ name }: { name: string }) => {
+    mutationFn: async ({ name, emoji = '📦' }: { name: string; emoji?: string }) => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
@@ -93,7 +93,7 @@ export function useCreateExpenseCategory() {
 
       const { data, error } = await supabase
         .from('expense_categories')
-        .insert({ user_id: user.id, name, sort_order: nextOrder })
+        .insert({ user_id: user.id, name, emoji, sort_order: nextOrder })
         .select()
         .single()
 
@@ -111,10 +111,10 @@ export function useUpdateIncomeCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    mutationFn: async ({ id, name, emoji }: { id: string; name: string; emoji?: string }) => {
       const { data, error } = await supabase
         .from('income_categories')
-        .update({ name, updated_at: new Date().toISOString() })
+        .update({ name, emoji, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single()
@@ -133,10 +133,10 @@ export function useUpdateExpenseCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    mutationFn: async ({ id, name, emoji }: { id: string; name: string; emoji?: string }) => {
       const { data, error } = await supabase
         .from('expense_categories')
-        .update({ name, updated_at: new Date().toISOString() })
+        .update({ name, emoji, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single()

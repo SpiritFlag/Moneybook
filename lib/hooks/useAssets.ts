@@ -199,10 +199,12 @@ export function useCreateAsset() {
       categoryId,
       name,
       initialBalance = 0,
+      currencyId = null,
     }: {
       categoryId: string
       name: string
       initialBalance?: number
+      currencyId?: string | null
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -225,6 +227,7 @@ export function useCreateAsset() {
           category_id: categoryId,
           name,
           initial_balance: initialBalance,
+          currency_id: currencyId,
           sort_order: nextOrder,
         })
         .select()
@@ -250,16 +253,19 @@ export function useUpdateAsset() {
       name,
       initialBalance,
       categoryId,
+      currencyId,
     }: {
       id: string
       name?: string
       initialBalance?: number
       categoryId?: string
+      currencyId?: string | null
     }) => {
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
       if (name !== undefined) updates.name = name
       if (initialBalance !== undefined) updates.initial_balance = initialBalance
       if (categoryId !== undefined) updates.category_id = categoryId
+      if (currencyId !== undefined) updates.currency_id = currencyId
 
       const { data, error } = await supabase
         .from('assets')

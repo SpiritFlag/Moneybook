@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { parseCurrency, formatNumber } from '@/lib/utils/currency'
+import { useCurrencies } from '@/lib/hooks/useCurrencies'
 import type { Asset, AssetCategory } from '@/types/database'
 
 interface AssetFormProps {
@@ -27,7 +28,7 @@ interface AssetFormProps {
   asset?: Asset | null
   categories: AssetCategory[]
   defaultCategoryId?: string
-  onSubmit: (data: { name: string; initialBalance: number; categoryId: string }) => void
+  onSubmit: (data: { name: string; initialBalance: number; categoryId: string; currencyId: string | null }) => void
   onDelete?: () => void
 }
 
@@ -44,6 +45,9 @@ export function AssetForm({
   const [balanceInput, setBalanceInput] = useState('')
   const [isNegative, setIsNegative] = useState(false)
   const [categoryId, setCategoryId] = useState('')
+  const [currencyId, setCurrencyId] = useState<string>('')
+
+  const { data: currencies = [] } = useCurrencies()
 
   // 폼이 열릴 때마다 값 초기화
   useEffect(() => {
@@ -53,6 +57,7 @@ export function AssetForm({
       setIsNegative(balance < 0)
       setBalanceInput(balance !== 0 ? formatNumber(Math.abs(balance)) : '')
       setCategoryId(asset?.category_id || defaultCategoryId || '')
+      setCurrencyId(asset?.currency_id || '')
     }
   }, [open, asset, defaultCategoryId])
 
@@ -65,6 +70,7 @@ export function AssetForm({
       name: name.trim(),
       initialBalance: isNegative ? -amount : amount,
       categoryId,
+      currencyId: currencyId || null,
     })
     onOpenChange(false)
     setName('')
@@ -75,6 +81,8 @@ export function AssetForm({
     const num = parseCurrency(value)
     setBalanceInput(num === 0 && value !== '0' ? '' : formatNumber(num))
   }
+
+  const selectedCurrency = currencies.find((c) => c.id === currencyId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -109,6 +117,22 @@ export function AssetForm({
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="currency">화폐 단위</Label>
+            <Select value={currencyId} onValueChange={setCurrencyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="원화 (기본)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">원화 (기본)</SelectItem>
+                {currencies.map((cur) => (
+                  <SelectItem key={cur.id} value={cur.id}>
+                    {cur.name} ({cur.symbol})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="balance">시작 금액</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -122,7 +146,7 @@ export function AssetForm({
                   className={`pr-8 ${isNegative ? 'text-red-500' : ''}`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                  원
+                  {selectedCurrency?.symbol || '원'}
                 </span>
               </div>
               <Button

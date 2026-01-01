@@ -65,6 +65,14 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    touchAction: 'manipulation',
+  }
+
+  // 드래그 중이면 클릭 무시
+  const handleClick = () => {
+    if (!isDragging) {
+      onClick()
+    }
   }
 
   const getAssetName = (id: string) => assets.find((a) => a.id === id)?.name || ''
@@ -104,7 +112,7 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
         style={style}
         {...attributes}
         {...listeners}
-        onClick={onClick}
+        onClick={handleClick}
         className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-transfer/50 cursor-pointer"
       >
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-transfer/30 flex items-center justify-center">
@@ -150,7 +158,7 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
       style={style}
       {...attributes}
       {...listeners}
-      onClick={onClick}
+      onClick={handleClick}
       className={`flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 cursor-pointer ${
         isIncome ? 'hover:border-income/50' : 'hover:border-expense/50'
       }`}

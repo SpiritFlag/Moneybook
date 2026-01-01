@@ -34,6 +34,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login')
+  const isClaudeApi = request.nextUrl.pathname.startsWith('/api/claude-view')
+
+  // Claude API는 자체 인증 사용
+  if (isClaudeApi) {
+    return supabaseResponse
+  }
 
   if (!user && !isAuthPage) {
     const url = request.nextUrl.clone()

@@ -65,7 +65,6 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    touchAction: 'manipulation',
   }
 
   // 드래그 중이면 클릭 무시
@@ -73,6 +72,11 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
     if (!isDragging) {
       onClick()
     }
+  }
+
+  // 드래그 핸들 스타일
+  const handleStyle = {
+    touchAction: 'none',
   }
 
   const getAssetName = (id: string) => assets.find((a) => a.id === id)?.name || ''
@@ -111,11 +115,14 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
         ref={setNodeRef}
         style={style}
         {...attributes}
-        {...listeners}
         onClick={handleClick}
         className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-transfer/50 cursor-pointer"
       >
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-transfer/30 flex items-center justify-center">
+        <div
+          {...listeners}
+          style={handleStyle}
+          className="flex-shrink-0 w-8 h-8 rounded-full bg-transfer/30 flex items-center justify-center cursor-grab active:cursor-grabbing"
+        >
           <ArrowRightLeft className="w-4 h-4 text-gray-600" />
         </div>
         <div className="flex-1 min-w-0">
@@ -157,13 +164,16 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       onClick={handleClick}
       className={`flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 cursor-pointer ${
         isIncome ? 'hover:border-income/50' : 'hover:border-expense/50'
       }`}
     >
-      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xl">
+      <div
+        {...listeners}
+        style={handleStyle}
+        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xl cursor-grab active:cursor-grabbing"
+      >
         {category?.emoji || (isIncome ? '💰' : '📦')}
       </div>
       <div className="flex-1 min-w-0">
@@ -234,7 +244,7 @@ function LedgerContent() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 

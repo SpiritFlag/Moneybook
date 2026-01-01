@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,21 +40,30 @@ export function AssetForm({
   onSubmit,
   onDelete,
 }: AssetFormProps) {
-  const [name, setName] = useState(asset?.name || '')
-  const [balanceInput, setBalanceInput] = useState(
-    asset ? formatNumber(asset.initial_balance) : ''
-  )
-  const [categoryId, setCategoryId] = useState(
-    asset?.category_id || defaultCategoryId || ''
-  )
+  const [name, setName] = useState('')
+  const [balanceInput, setBalanceInput] = useState('')
+  const [isNegative, setIsNegative] = useState(false)
+  const [categoryId, setCategoryId] = useState('')
+
+  // 폼이 열릴 때마다 값 초기화
+  useEffect(() => {
+    if (open) {
+      setName(asset?.name || '')
+      const balance = asset?.initial_balance || 0
+      setIsNegative(balance < 0)
+      setBalanceInput(balance !== 0 ? formatNumber(Math.abs(balance)) : '')
+      setCategoryId(asset?.category_id || defaultCategoryId || '')
+    }
+  }, [open, asset, defaultCategoryId])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !categoryId) return
 
+    const amount = parseCurrency(balanceInput)
     onSubmit({
       name: name.trim(),
-      initialBalance: parseCurrency(balanceInput),
+      initialBalance: isNegative ? -amount : amount,
       categoryId,
     })
     onOpenChange(false)
@@ -101,19 +110,29 @@ export function AssetForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="balance">시작 금액</Label>
-            <div className="relative">
-              <Input
-                id="balance"
-                type="text"
-                inputMode="numeric"
-                value={balanceInput}
-                onChange={(e) => handleBalanceChange(e.target.value)}
-                placeholder="0"
-                className="pr-8"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                원
-              </span>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  id="balance"
+                  type="text"
+                  inputMode="numeric"
+                  value={balanceInput}
+                  onChange={(e) => handleBalanceChange(e.target.value)}
+                  placeholder="0"
+                  className={`pr-8 ${isNegative ? 'text-red-500' : ''}`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                  원
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant={isNegative ? "destructive" : "outline"}
+                onClick={() => setIsNegative(!isNegative)}
+                className="px-3 shrink-0"
+              >
+                {isNegative ? '−' : '+/−'}
+              </Button>
             </div>
           </div>
           <DialogFooter className="flex gap-2">

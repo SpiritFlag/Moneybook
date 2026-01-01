@@ -180,6 +180,10 @@ export type Database = {
           amount: number
           adjustment_amount: number
           adjustment_memo: string | null
+          original_amount: number | null
+          original_adjustment_amount: number | null
+          original_currency_id: string | null
+          exchange_rate: number | null
           title: string
           memo: string | null
           sort_order: number
@@ -196,6 +200,10 @@ export type Database = {
           amount: number
           adjustment_amount?: number
           adjustment_memo?: string | null
+          original_amount?: number | null
+          original_adjustment_amount?: number | null
+          original_currency_id?: string | null
+          exchange_rate?: number | null
           title: string
           memo?: string | null
           sort_order?: number
@@ -212,6 +220,10 @@ export type Database = {
           amount?: number
           adjustment_amount?: number
           adjustment_memo?: string | null
+          original_amount?: number | null
+          original_adjustment_amount?: number | null
+          original_currency_id?: string | null
+          exchange_rate?: number | null
           title?: string
           memo?: string | null
           sort_order?: number
@@ -227,6 +239,9 @@ export type Database = {
           from_asset_id: string
           to_asset_id: string
           amount: number
+          original_amount: number | null
+          original_currency_id: string | null
+          exchange_rate: number | null
           title: string | null
           memo: string | null
           sort_order: number
@@ -240,6 +255,9 @@ export type Database = {
           from_asset_id: string
           to_asset_id: string
           amount: number
+          original_amount?: number | null
+          original_currency_id?: string | null
+          exchange_rate?: number | null
           title?: string | null
           memo?: string | null
           sort_order?: number
@@ -253,6 +271,9 @@ export type Database = {
           from_asset_id?: string
           to_asset_id?: string
           amount?: number
+          original_amount?: number | null
+          original_currency_id?: string | null
+          exchange_rate?: number | null
           title?: string | null
           memo?: string | null
           sort_order?: number

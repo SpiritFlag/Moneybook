@@ -15,6 +15,11 @@ export interface TransactionFormData {
   adjustmentMemo?: string
   title: string
   memo?: string
+  // 보조화폐 관련
+  originalAmount?: number | null
+  originalAdjustmentAmount?: number | null
+  originalCurrencyId?: string | null
+  exchangeRate?: number | null
 }
 
 export interface TransferFormData {
@@ -24,6 +29,10 @@ export interface TransferFormData {
   amount: number
   title?: string
   memo?: string
+  // 보조화폐 관련
+  originalAmount?: number | null
+  originalCurrencyId?: string | null
+  exchangeRate?: number | null
 }
 
 export function useTransactions(year: number, month: number) {
@@ -141,6 +150,10 @@ export function useCreateTransaction() {
           amount: data.amount,
           adjustment_amount: data.adjustmentAmount || 0,
           adjustment_memo: data.adjustmentMemo || null,
+          original_amount: data.originalAmount ?? null,
+          original_adjustment_amount: data.originalAdjustmentAmount ?? null,
+          original_currency_id: data.originalCurrencyId ?? null,
+          exchange_rate: data.exchangeRate ?? null,
           title: data.title,
           memo: data.memo || null,
           sort_order: nextOrder,
@@ -174,6 +187,10 @@ export function useUpdateTransaction() {
           amount: data.amount,
           adjustment_amount: data.adjustmentAmount || 0,
           adjustment_memo: data.adjustmentMemo || null,
+          original_amount: data.originalAmount ?? null,
+          original_adjustment_amount: data.originalAdjustmentAmount ?? null,
+          original_currency_id: data.originalCurrencyId ?? null,
+          exchange_rate: data.exchangeRate ?? null,
           title: data.title,
           memo: data.memo || null,
           updated_at: new Date().toISOString(),
@@ -241,6 +258,9 @@ export function useCreateTransfer() {
           from_asset_id: data.fromAssetId,
           to_asset_id: data.toAssetId,
           amount: data.amount,
+          original_amount: data.originalAmount ?? null,
+          original_currency_id: data.originalCurrencyId ?? null,
+          exchange_rate: data.exchangeRate ?? null,
           title: data.title || null,
           memo: data.memo || null,
           sort_order: nextOrder,
@@ -271,6 +291,9 @@ export function useUpdateTransfer() {
           from_asset_id: data.fromAssetId,
           to_asset_id: data.toAssetId,
           amount: data.amount,
+          original_amount: data.originalAmount ?? null,
+          original_currency_id: data.originalCurrencyId ?? null,
+          exchange_rate: data.exchangeRate ?? null,
           title: data.title || null,
           memo: data.memo || null,
           updated_at: new Date().toISOString(),

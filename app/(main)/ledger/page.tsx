@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, ArrowRightLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowRightLeft, X } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -29,9 +29,10 @@ import { Card } from '@/components/ui/card'
 import { useTransactions, useTransfers, useReorderTransactions, useReorderTransfers } from '@/lib/hooks/useTransactions'
 import { useAssets } from '@/lib/hooks/useAssets'
 import { useIncomeCategories, useExpenseCategories } from '@/lib/hooks/useCategories'
+import { useCurrencies } from '@/lib/hooks/useCurrencies'
 import { getCurrentYearMonth, getPreviousMonth, getNextMonth, formatDateString } from '@/lib/utils/date'
 import { formatCurrency, getEffectiveAmount } from '@/lib/utils/currency'
-import type { Transaction, Transfer, Asset, IncomeCategory, ExpenseCategory } from '@/types/database'
+import type { Transaction, Transfer, Asset, IncomeCategory, ExpenseCategory, Currency } from '@/types/database'
 
 interface LedgerEntry {
   id: string
@@ -44,12 +45,13 @@ interface LedgerEntry {
 interface SortableEntryProps {
   entry: LedgerEntry
   assets: Asset[]
+  currencies: Currency[]
   incomeCategories: IncomeCategory[]
   expenseCategories: ExpenseCategory[]
   onClick: () => void
 }
 
-function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onClick }: SortableEntryProps) {
+function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCategories, onClick }: SortableEntryProps) {
   const {
     attributes,
     listeners,
@@ -70,9 +72,32 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
     const cats = type === 'income' ? incomeCategories : expenseCategories
     return cats.find((c) => c.id === id)
   }
+  // 보조화폐가 있는 경우 원본 금액 + 환산 금액 표시
+  const formatAmountWithOriginal = (
+    amount: number,
+    originalAmount: number | null,
+    originalCurrencyId: string | null
+  ) => {
+    if (originalAmount && originalCurrencyId) {
+      const currency = currencies.find((c) => c.id === originalCurrencyId)
+      if (currency) {
+        return {
+          main: `${originalAmount.toLocaleString()} ${currency.symbol}`,
+          sub: `≈${formatCurrency(amount)}`,
+        }
+      }
+    }
+    return { main: formatCurrency(amount), sub: null }
+  }
 
   if (entry.type === 'transfer') {
     const transfer = entry.data as Transfer
+    const amountDisplay = formatAmountWithOriginal(
+      transfer.amount,
+      transfer.original_amount,
+      transfer.original_currency_id
+    )
+
     return (
       <div
         ref={setNodeRef}
@@ -80,7 +105,7 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
         {...attributes}
         {...listeners}
         onClick={onClick}
-        className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-transfer/50 cursor-pointer touch-none"
+        className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-transfer/50 cursor-pointer"
       >
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-transfer/30 flex items-center justify-center">
           <ArrowRightLeft className="w-4 h-4 text-gray-600" />
@@ -95,17 +120,29 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
             <p className="text-gray-700 truncate">{transfer.title}</p>
           )}
         </div>
-        <span className="text-gray-600 font-medium">
-          {formatCurrency(transfer.amount)}
-        </span>
+        <div className="text-right">
+          <span className="text-gray-600 font-medium">{amountDisplay.main}</span>
+          {amountDisplay.sub && (
+            <p className="text-xs text-gray-400">{amountDisplay.sub}</p>
+          )}
+        </div>
       </div>
     )
   }
 
   const transaction = entry.data as Transaction
   const effectiveAmount = getEffectiveAmount(transaction.amount, transaction.adjustment_amount)
+  const originalEffectiveAmount = transaction.original_amount
+    ? getEffectiveAmount(transaction.original_amount, transaction.original_adjustment_amount || 0)
+    : null
   const isIncome = transaction.type === 'income'
   const category = getCategory(transaction.category_id, transaction.type)
+
+  const amountDisplay = formatAmountWithOriginal(
+    effectiveAmount,
+    originalEffectiveAmount,
+    transaction.original_currency_id
+  )
 
   return (
     <div
@@ -114,7 +151,7 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className={`flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 cursor-pointer touch-none ${
+      className={`flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 cursor-pointer ${
         isIncome ? 'hover:border-income/50' : 'hover:border-expense/50'
       }`}
     >
@@ -134,9 +171,17 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
       </div>
       <div className="text-right">
         <span className={`font-medium ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-          {isIncome ? '+' : '-'}{formatCurrency(effectiveAmount)}
+          {isIncome ? '+' : '-'}{amountDisplay.main}
         </span>
-        {transaction.adjustment_amount > 0 && (
+        {amountDisplay.sub && (
+          <p className="text-xs text-gray-400">{amountDisplay.sub}</p>
+        )}
+        {transaction.adjustment_amount > 0 && transaction.original_adjustment_amount && (
+          <p className="text-xs text-gray-400">
+            ({transaction.type === 'income' ? '공제' : '할인'} {transaction.original_adjustment_amount.toLocaleString()})
+          </p>
+        )}
+        {transaction.adjustment_amount > 0 && !transaction.original_adjustment_amount && (
           <p className="text-xs text-gray-400">
             ({transaction.type === 'income' ? '공제' : '할인'} {formatCurrency(transaction.adjustment_amount)})
           </p>
@@ -146,8 +191,12 @@ function SortableEntry({ entry, assets, incomeCategories, expenseCategories, onC
   )
 }
 
-export default function LedgerPage() {
+function LedgerContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const filterType = searchParams.get('type') as 'income' | 'expense' | null
+  const filterCategoryId = searchParams.get('category')
+
   const { year: currentYear, month: currentMonth } = getCurrentYearMonth()
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState(currentMonth)
@@ -157,6 +206,20 @@ export default function LedgerPage() {
   const { data: assets = [] } = useAssets()
   const { data: incomeCategories = [] } = useIncomeCategories()
   const { data: expenseCategories = [] } = useExpenseCategories()
+  const { data: currencies = [] } = useCurrencies()
+
+  // 필터링된 분류 정보
+  const filterCategory = useMemo(() => {
+    if (!filterCategoryId) return null
+    if (filterType === 'income') {
+      return incomeCategories.find((c) => c.id === filterCategoryId)
+    }
+    return expenseCategories.find((c) => c.id === filterCategoryId)
+  }, [filterCategoryId, filterType, incomeCategories, expenseCategories])
+
+  const clearFilter = () => {
+    router.push('/ledger')
+  }
 
   const reorderTransactions = useReorderTransactions()
   const reorderTransfers = useReorderTransfers()
@@ -169,15 +232,26 @@ export default function LedgerPage() {
 
   // 통합 엔트리 생성 및 날짜별 그룹핑
   const { entriesByDate, monthSummary } = useMemo(() => {
+    // 필터링 적용
+    let filteredTransactions = transactions
+    if (filterCategoryId && filterType) {
+      filteredTransactions = transactions.filter((tx) =>
+        tx.type === filterType && tx.category_id === filterCategoryId
+      )
+    }
+
+    // 필터 적용시 이체는 제외
+    const filteredTransfers = filterCategoryId ? [] : transfers
+
     const entries: LedgerEntry[] = [
-      ...transactions.map((tx) => ({
+      ...filteredTransactions.map((tx) => ({
         id: `tx-${tx.id}`,
         date: tx.transaction_date,
         sortOrder: tx.sort_order,
         type: tx.type as 'income' | 'expense',
         data: tx,
       })),
-      ...transfers.map((tr) => ({
+      ...filteredTransfers.map((tr) => ({
         id: `tr-${tr.id}`,
         date: tr.transfer_date,
         sortOrder: tr.sort_order,
@@ -220,7 +294,7 @@ export default function LedgerPage() {
         balance: totalIncome - totalExpense,
       },
     }
-  }, [transactions, transfers])
+  }, [transactions, transfers, filterCategoryId, filterType])
 
   // 날짜별 합계 계산
   const getDailySummary = (dateEntries: LedgerEntry[]) => {
@@ -304,6 +378,26 @@ export default function LedgerPage() {
 
   return (
     <div className="p-4 space-y-4">
+      {/* 필터 표시 */}
+      {filterCategory && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-pastel-purple/20 rounded-lg">
+          <span className="text-xl">{filterCategory.emoji}</span>
+          <span className="font-medium text-gray-700">{filterCategory.name}</span>
+          <span className="text-sm text-gray-500">
+            ({filterType === 'income' ? '수입' : '지출'})
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilter}
+            className="ml-auto h-7 px-2"
+          >
+            <X className="w-4 h-4" />
+            필터 해제
+          </Button>
+        </div>
+      )}
+
       {/* 월 선택 헤더 */}
       <Card className="p-4">
         <div className="flex items-center justify-between">
@@ -370,6 +464,7 @@ export default function LedgerPage() {
                         key={entry.id}
                         entry={entry}
                         assets={assets}
+                        currencies={currencies}
                         incomeCategories={incomeCategories}
                         expenseCategories={expenseCategories}
                         onClick={() => handleEntryClick(entry)}
@@ -383,5 +478,22 @@ export default function LedgerPage() {
         })
       )}
     </div>
+  )
+}
+
+export default function LedgerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-4 space-y-4">
+          <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-gray-100 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      }
+    >
+      <LedgerContent />
+    </Suspense>
   )
 }

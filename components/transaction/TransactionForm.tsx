@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -32,6 +32,7 @@ import { Card } from '@/components/ui/card'
 
 import { useAssets, useAssetCategories } from '@/lib/hooks/useAssets'
 import { useIncomeCategories, useExpenseCategories } from '@/lib/hooks/useCategories'
+import { useCurrencies } from '@/lib/hooks/useCurrencies'
 import {
   useCreateTransaction,
   useUpdateTransaction,
@@ -79,11 +80,13 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
   const [toAssetId, setToAssetId] = useState(transfer?.to_asset_id || '')
 
   const [amountInput, setAmountInput] = useState(() => {
-    const amount = transaction?.amount || transfer?.amount || 0
+    // 보조화폐가 있으면 원본 금액을, 없으면 환산된 금액을 표시
+    const amount = transaction?.original_amount ?? transaction?.amount ??
+                   transfer?.original_amount ?? transfer?.amount ?? 0
     return amount > 0 ? formatNumber(amount) : ''
   })
   const [adjustmentInput, setAdjustmentInput] = useState(() => {
-    const adj = transaction?.adjustment_amount || 0
+    const adj = transaction?.original_adjustment_amount ?? transaction?.adjustment_amount ?? 0
     return adj > 0 ? formatNumber(adj) : ''
   })
   const [adjustmentMemo, setAdjustmentMemo] = useState(transaction?.adjustment_memo || '')
@@ -97,6 +100,28 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
   const { data: assetCategories = [] } = useAssetCategories()
   const { data: incomeCategories = [] } = useIncomeCategories()
   const { data: expenseCategories = [] } = useExpenseCategories()
+  const { data: currencies = [] } = useCurrencies()
+
+  // 선택된 자산의 통화 정보 가져오기
+  const currencyInfo = useMemo(() => {
+    const getAssetCurrency = (id: string) => {
+      const asset = assets.find((a) => a.id === id)
+      if (!asset?.currency_id) return null
+      return currencies.find((c) => c.id === asset.currency_id)
+    }
+
+    const selectedCurrency = assetId ? getAssetCurrency(assetId) : null
+    const fromCurrency = fromAssetId ? getAssetCurrency(fromAssetId) : null
+    const currency = selectedCurrency || fromCurrency
+
+    return {
+      symbol: currency?.symbol || '원',
+      exchangeRate: currency?.exchange_rate || null,
+      currencyId: currency?.id || null,
+    }
+  }, [assetId, fromAssetId, assets, currencies])
+
+  const currencySymbol = currencyInfo.symbol
 
   // 뮤테이션
   const createTransaction = useCreateTransaction()
@@ -153,13 +178,21 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
         return
       }
 
+      // 보조화폐인 경우 원화로 환산
+      const { exchangeRate, currencyId } = currencyInfo
+      const convertedAmount = exchangeRate ? Math.round(amount * exchangeRate) : amount
+
       const data: TransferFormData = {
         transferDate: toDateString(date),
         fromAssetId,
         toAssetId,
-        amount,
+        amount: convertedAmount,
         title: title || undefined,
         memo: memo || undefined,
+        // 보조화폐 정보
+        originalAmount: exchangeRate ? amount : null,
+        originalCurrencyId: currencyId,
+        exchangeRate: exchangeRate,
       }
 
       if (transfer) {
@@ -193,16 +226,27 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
         return
       }
 
+      // 보조화폐인 경우 원화로 환산
+      const { exchangeRate, currencyId } = currencyInfo
+      const adjustmentAmount = parseCurrency(adjustmentInput)
+      const convertedAmount = exchangeRate ? Math.round(amount * exchangeRate) : amount
+      const convertedAdjustment = exchangeRate ? Math.round(adjustmentAmount * exchangeRate) : adjustmentAmount
+
       const data: TransactionFormData = {
         type,
         transactionDate: toDateString(date),
         assetId,
         categoryId,
-        amount,
-        adjustmentAmount: parseCurrency(adjustmentInput),
+        amount: convertedAmount,
+        adjustmentAmount: convertedAdjustment,
         adjustmentMemo: adjustmentMemo || undefined,
         title: title.trim(),
         memo: memo || undefined,
+        // 보조화폐 정보
+        originalAmount: exchangeRate ? amount : null,
+        originalAdjustmentAmount: exchangeRate && adjustmentAmount > 0 ? adjustmentAmount : null,
+        originalCurrencyId: currencyId,
+        exchangeRate: exchangeRate,
       }
 
       if (transaction) {
@@ -404,17 +448,17 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
         {/* 금액 입력 */}
         <div className="space-y-2">
           <Label>금액</Label>
-          <div className="relative">
+          <div className="flex items-center gap-2">
             <Input
               type="text"
               inputMode="numeric"
               value={amountInput}
               onChange={(e) => handleAmountChange(e.target.value)}
               placeholder="0"
-              className="text-right pr-8 text-lg font-medium"
+              className="text-right text-lg font-medium flex-1"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-              원
+            <span className="text-gray-500 shrink-0">
+              {currencySymbol}
             </span>
           </div>
         </div>
@@ -424,17 +468,17 @@ export function TransactionForm({ transaction, transfer, defaultType = 'expense'
           <div className="space-y-2">
             <Label>{type === 'income' ? '공제' : '할인'} (선택)</Label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
+              <div className="flex items-center gap-1 flex-1">
                 <Input
                   type="text"
                   inputMode="numeric"
                   value={adjustmentInput}
                   onChange={(e) => handleAdjustmentChange(e.target.value)}
                   placeholder="0"
-                  className="text-right pr-8"
+                  className="text-right"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                  원
+                <span className="text-gray-500 text-sm shrink-0">
+                  {currencySymbol}
                 </span>
               </div>
               <Input

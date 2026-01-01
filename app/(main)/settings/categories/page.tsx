@@ -256,7 +256,7 @@ export default function SettingsCategoriesPage() {
                           setEditingCategory(category)
                           setFormOpen(true)
                         }}
-                        onClick={() => router.push(`/settings/categories/income/${category.id}`)}
+                        onClick={() => router.push(`/ledger?type=income&category=${category.id}`)}
                       />
                     ))}
                   </div>
@@ -292,7 +292,7 @@ export default function SettingsCategoriesPage() {
                           setEditingCategory(category)
                           setFormOpen(true)
                         }}
-                        onClick={() => router.push(`/settings/categories/expense/${category.id}`)}
+                        onClick={() => router.push(`/ledger?type=expense&category=${category.id}`)}
                       />
                     ))}
                   </div>

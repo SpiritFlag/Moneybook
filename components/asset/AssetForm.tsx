@@ -45,7 +45,7 @@ export function AssetForm({
   const [balanceInput, setBalanceInput] = useState('')
   const [isNegative, setIsNegative] = useState(false)
   const [categoryId, setCategoryId] = useState('')
-  const [currencyId, setCurrencyId] = useState<string>('')
+  const [currencyId, setCurrencyId] = useState<string>('__none__')
 
   const { data: currencies = [] } = useCurrencies()
 
@@ -57,7 +57,7 @@ export function AssetForm({
       setIsNegative(balance < 0)
       setBalanceInput(balance !== 0 ? formatNumber(Math.abs(balance)) : '')
       setCategoryId(asset?.category_id || defaultCategoryId || '')
-      setCurrencyId(asset?.currency_id || '')
+      setCurrencyId(asset?.currency_id || '__none__')
     }
   }, [open, asset, defaultCategoryId])
 
@@ -70,7 +70,7 @@ export function AssetForm({
       name: name.trim(),
       initialBalance: isNegative ? -amount : amount,
       categoryId,
-      currencyId: currencyId || null,
+      currencyId: currencyId === '__none__' ? null : currencyId,
     })
     onOpenChange(false)
     setName('')
@@ -82,7 +82,7 @@ export function AssetForm({
     setBalanceInput(num === 0 && value !== '0' ? '' : formatNumber(num))
   }
 
-  const selectedCurrency = currencies.find((c) => c.id === currencyId)
+  const selectedCurrency = currencies.find((c) => c.id === currencyId && currencyId !== '__none__')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,7 +123,7 @@ export function AssetForm({
                 <SelectValue placeholder="원화 (기본)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">원화 (기본)</SelectItem>
+                <SelectItem value="__none__">원화 (기본)</SelectItem>
                 {currencies.map((cur) => (
                   <SelectItem key={cur.id} value={cur.id}>
                     {cur.name} ({cur.symbol})

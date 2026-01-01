@@ -55,13 +55,20 @@ export function useAssetsWithBalance() {
       if (assetsError) throw assetsError
       const assets = assetsData as Asset[]
 
-      // 거래 조회
+      // 거래 조회 (보조화폐용 original_amount도 함께)
       const { data: transactionsData, error: txError } = await supabase
         .from('transactions')
-        .select('asset_id, type, amount, adjustment_amount')
+        .select('asset_id, type, amount, adjustment_amount, original_amount, original_adjustment_amount')
 
       if (txError) throw txError
-      const transactions = transactionsData as { asset_id: string; type: string; amount: number; adjustment_amount: number }[]
+      const transactions = transactionsData as {
+        asset_id: string
+        type: string
+        amount: number
+        adjustment_amount: number
+        original_amount: number | null
+        original_adjustment_amount: number | null
+      }[]
 
       // 이체 조회
       const { data: transfersData, error: trError } = await supabase
@@ -71,14 +78,25 @@ export function useAssetsWithBalance() {
       if (trError) throw trError
       const transfers = transfersData as { from_asset_id: string; to_asset_id: string; amount: number }[]
 
+      // 통화 정보 조회
+      const { data: currenciesData } = await supabase
+        .from('currencies')
+        .select('id, exchange_rate')
+      const currencies = (currenciesData || []) as { id: string; exchange_rate: number }[]
+
       // 잔고 계산
       return assets.map((asset) => {
         let balance = asset.initial_balance
+        const currency = asset.currency_id ? currencies.find(c => c.id === asset.currency_id) : null
 
         // 수입/지출 반영
         transactions?.forEach((tx) => {
           if (tx.asset_id === asset.id) {
-            const effectiveAmount = tx.amount - (tx.adjustment_amount || 0)
+            // 보조화폐 자산이면 original_amount 사용, 아니면 amount 사용
+            const txAmount = tx.original_amount ?? tx.amount
+            const txAdjustment = tx.original_adjustment_amount ?? tx.adjustment_amount ?? 0
+            const effectiveAmount = txAmount - txAdjustment
+
             if (tx.type === 'income') {
               balance += effectiveAmount
             } else {
@@ -87,13 +105,19 @@ export function useAssetsWithBalance() {
           }
         })
 
-        // 이체 반영
+        // 이체 반영 - 보조화폐 자산이면 환율로 나눠서 계산
         transfers?.forEach((tr) => {
           if (tr.from_asset_id === asset.id) {
-            balance -= tr.amount
+            const transferAmount = currency
+              ? Math.round(tr.amount / currency.exchange_rate)
+              : tr.amount
+            balance -= transferAmount
           }
           if (tr.to_asset_id === asset.id) {
-            balance += tr.amount
+            const transferAmount = currency
+              ? Math.round(tr.amount / currency.exchange_rate)
+              : tr.amount
+            balance += transferAmount
           }
         })
 

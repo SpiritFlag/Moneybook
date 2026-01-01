@@ -180,11 +180,13 @@ function SortableEntry({ entry, assets, currencies, incomeCategories, expenseCat
 
   const transaction = entry.data as Transaction
   const effectiveAmount = getEffectiveAmount(transaction.amount, transaction.adjustment_amount)
+  const isIncome = transaction.type === 'income'
+  const category = getCategory(transaction.category_id, transaction.type)
+
+  // 보조화폐가 있으면 보조화폐 기준으로 실효 금액 계산
   const originalEffectiveAmount = transaction.original_amount
     ? getEffectiveAmount(transaction.original_amount, transaction.original_adjustment_amount || 0)
     : null
-  const isIncome = transaction.type === 'income'
-  const category = getCategory(transaction.category_id, transaction.type)
 
   const amountDisplay = formatAmountWithOriginal(
     effectiveAmount,
@@ -247,6 +249,7 @@ function LedgerContent() {
   const searchParams = useSearchParams()
   const filterType = searchParams.get('type') as 'income' | 'expense' | null
   const filterCategoryId = searchParams.get('category')
+  const filterAssetId = searchParams.get('asset')
 
   const { year: currentYear, month: currentMonth } = getCurrentYearMonth()
   const [year, setYear] = useState(currentYear)
@@ -267,6 +270,12 @@ function LedgerContent() {
     }
     return expenseCategories.find((c) => c.id === filterCategoryId)
   }, [filterCategoryId, filterType, incomeCategories, expenseCategories])
+
+  // 필터링된 자산 정보
+  const filterAsset = useMemo(() => {
+    if (!filterAssetId) return null
+    return assets.find((a) => a.id === filterAssetId)
+  }, [filterAssetId, assets])
 
   const clearFilter = () => {
     router.push('/ledger')
@@ -290,9 +299,21 @@ function LedgerContent() {
         tx.type === filterType && tx.category_id === filterCategoryId
       )
     }
+    if (filterAssetId) {
+      filteredTransactions = filteredTransactions.filter((tx) =>
+        tx.asset_id === filterAssetId
+      )
+    }
 
-    // 필터 적용시 이체는 제외
-    const filteredTransfers = filterCategoryId ? [] : transfers
+    // 자산 필터 적용시 해당 자산 관련 이체만, 분류 필터 적용시 이체 제외
+    let filteredTransfers = transfers
+    if (filterCategoryId) {
+      filteredTransfers = []
+    } else if (filterAssetId) {
+      filteredTransfers = transfers.filter((tr) =>
+        tr.from_asset_id === filterAssetId || tr.to_asset_id === filterAssetId
+      )
+    }
 
     const entries: LedgerEntry[] = [
       ...filteredTransactions.map((tx) => ({
@@ -325,10 +346,10 @@ function LedgerContent() {
       grouped[date].sort((a, b) => a.sortOrder - b.sortOrder)
     })
 
-    // 월별 합계 계산
+    // 월별 합계 계산 (필터링된 거래 기준)
     let totalIncome = 0
     let totalExpense = 0
-    transactions.forEach((tx) => {
+    filteredTransactions.forEach((tx) => {
       const effective = getEffectiveAmount(tx.amount, tx.adjustment_amount)
       if (tx.type === 'income') {
         totalIncome += effective
@@ -336,6 +357,20 @@ function LedgerContent() {
         totalExpense += effective
       }
     })
+
+    // 자산 필터 시 이체도 합계에 반영
+    if (filterAssetId) {
+      filteredTransfers.forEach((tr) => {
+        if (tr.from_asset_id === filterAssetId) {
+          // 출금 = 지출
+          totalExpense += tr.amount
+        }
+        if (tr.to_asset_id === filterAssetId) {
+          // 입금 = 수입
+          totalIncome += tr.amount
+        }
+      })
+    }
 
     return {
       entriesByDate: grouped,
@@ -345,7 +380,7 @@ function LedgerContent() {
         balance: totalIncome - totalExpense,
       },
     }
-  }, [transactions, transfers, filterCategoryId, filterType])
+  }, [transactions, transfers, filterCategoryId, filterType, filterAssetId])
 
   // 날짜별 합계 계산
   const getDailySummary = (dateEntries: LedgerEntry[]) => {
@@ -437,6 +472,21 @@ function LedgerContent() {
           <span className="text-sm text-gray-500">
             ({filterType === 'income' ? '수입' : '지출'})
           </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilter}
+            className="ml-auto h-7 px-2"
+          >
+            <X className="w-4 h-4" />
+            필터 해제
+          </Button>
+        </div>
+      )}
+      {filterAsset && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-pastel-purple/20 rounded-lg">
+          <span className="text-xl">💰</span>
+          <span className="font-medium text-gray-700">{filterAsset.name}</span>
           <Button
             variant="ghost"
             size="sm"

@@ -70,6 +70,8 @@ function SortableAssetItem({ asset, currencies, onEdit, onClick }: SortableAsset
   }
 
   const currency = currencies.find((c) => c.id === asset.currency_id)
+  // current_balance는 이미 보조화폐 단위 (useAssetsWithBalance에서 계산됨)
+  // 원화 환산 금액 계산
   const krwAmount = currency ? Math.round(asset.current_balance * currency.exchange_rate) : null
 
   return (
@@ -92,14 +94,17 @@ function SortableAssetItem({ asset, currencies, onEdit, onClick }: SortableAsset
         <span className="font-medium text-gray-700">{asset.name}</span>
         <div className="flex items-center gap-2">
           <div className="text-right">
-            <span className={asset.current_balance >= 0 ? 'text-gray-800' : 'text-red-500'}>
-              {currency
-                ? `${asset.current_balance.toLocaleString()} ${currency.symbol}`
-                : formatCurrency(asset.current_balance)
-              }
-            </span>
-            {krwAmount !== null && (
-              <p className="text-xs text-gray-400">≈{formatCurrency(krwAmount)}</p>
+            {currency ? (
+              <>
+                <span className={asset.current_balance >= 0 ? 'text-gray-800' : 'text-red-500'}>
+                  {asset.current_balance.toLocaleString()} {currency.symbol}
+                </span>
+                <p className="text-xs text-gray-400">≈{formatCurrency(krwAmount!)}</p>
+              </>
+            ) : (
+              <span className={asset.current_balance >= 0 ? 'text-gray-800' : 'text-red-500'}>
+                {formatCurrency(asset.current_balance)}
+              </span>
             )}
           </div>
           <ChevronRight className="w-4 h-4 text-gray-400" />
